@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from m3ucheck.checks import Level, find_duplicates, run_checks
@@ -20,6 +21,14 @@ def test_parse_reads_name_url_and_attrs():
     assert ch.url == "https://example.com/1.m3u8"
     assert ch.group == "A"
     assert ch.line == 2
+
+
+def test_long_extinf_line_without_attrs_parses_fast():
+    text = "#EXTM3U\n#EXTINF:-1 " + "a" * 50_000 + "\n"
+    start = time.perf_counter()
+    r = parse(text)
+    assert time.perf_counter() - start < 1
+    assert [e.code for e in r.errors] == ["extinf-without-url"]
 
 
 def test_good_playlist_has_no_issues():

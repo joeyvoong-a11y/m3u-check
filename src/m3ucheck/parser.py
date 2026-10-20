@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
+# Lookbehind: börja bara matcha i början av ett namn, annars blir långa rader kvadratiska.
+ATTR_RE = re.compile(r'(?<![\w-])([\w-]+)="([^"]*)"')
 
 EXTINF_WITHOUT_URL = "#EXTINF utan URL efter"
 URL_WITHOUT_EXTINF = "URL utan #EXTINF före"
