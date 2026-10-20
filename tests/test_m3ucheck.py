@@ -67,6 +67,11 @@ def test_invalid_scheme_is_error():
     assert any(i.level is Level.ERROR and i.code == "invalid-scheme" for i in issues)
 
 
+def test_malformed_url_is_error_not_crash():
+    issues = run_checks(parse(GOOD.replace("https://example.com/1.m3u8", "http://[abc/x")))
+    assert [(i.level, i.code) for i in issues] == [(Level.ERROR, "malformed-url")]
+
+
 def test_report_counts_and_errors_only():
     text = GOOD.replace("https://", "ftp://").replace(' group-title="A"', "")
     report = Report(1, run_checks(parse(text)))
