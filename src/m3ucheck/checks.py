@@ -103,4 +103,4 @@ CHECKS: list[Callable[[ParseResult], Iterable[Issue]]] = [
 
 def run_checks(result: ParseResult) -> list[Issue]:
     issues = [issue for check in CHECKS for issue in check(result)]
-    return sorted(issues, key=lambda i: i.line)
+    return sorted(issues, key=lambda issue: issue.line)

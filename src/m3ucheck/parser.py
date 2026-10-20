@@ -62,22 +62,25 @@ def parse(text: str) -> ParseResult:
     errors: list[ParseError] = []
 
     pending: _PendingExtinf | None = None
-    for i, raw in enumerate(lines, start=1):
-        line = raw.strip()
-        if not line or line.startswith("#EXTM3U"):
+    for lineno, raw in enumerate(lines, start=1):
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#EXTM3U"):
             continue
-        if line.startswith("#EXTINF"):
+        if stripped.startswith("#EXTINF"):
             if pending is not None:
                 errors.append(_extinf_without_url(pending.line))
-            head, _, name = line.partition(",")
-            pending = _PendingExtinf(i, name.strip(), dict(ATTR_RE.findall(head)))
-        elif line.startswith("#"):
+            # Format: #EXTINF:-1 tvg-id="x" group-title="Y",Kanalnamn
+            # Attributen står före första kommatecknet, namnet efter. Ett dubblerat
+            # attribut tar det sista värdet (dict av findall).
+            head, _, name = stripped.partition(",")
+            pending = _PendingExtinf(lineno, name.strip(), dict(ATTR_RE.findall(head)))
+        elif stripped.startswith("#"):
             continue  # andra direktiv, t.ex. #EXTVLCOPT
         elif pending is not None:
-            channels.append(Channel(name=pending.name, url=line, line=pending.line, attrs=pending.attrs))
+            channels.append(Channel(name=pending.name, url=stripped, line=pending.line, attrs=pending.attrs))
             pending = None
         else:
-            errors.append(ParseError(i, "url-without-extinf", URL_WITHOUT_EXTINF))
+            errors.append(ParseError(lineno, "url-without-extinf", URL_WITHOUT_EXTINF))
 
     if pending is not None:
         errors.append(_extinf_without_url(pending.line))
