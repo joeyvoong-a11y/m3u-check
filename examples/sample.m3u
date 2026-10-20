@@ -1,0 +1,10 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="news1" tvg-logo="https://example.com/news.png" group-title="Nyheter",Exempel Nyheter
+https://example.com/live/news.m3u8
+#EXTINF:-1 tvg-id="sport1" group-title="Sport",Exempel Sport
+https://example.com/live/sport.m3u8
+#EXTINF:-1 tvg-logo="https://example.com/film.png",Exempel Film
+ftp://example.com/film.ts
+#EXTINF:-1 tvg-logo="https://example.com/news.png" group-title="Nyheter",Exempel Nyheter HD
+https://example.com/live/news.m3u8
+#EXTINF:-1 group-title="Musik",Trasig kanal
