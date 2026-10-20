@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from m3ucheck.checks import run_checks
+from m3ucheck.checks import Level, run_checks
 from m3ucheck.cli import main
 from m3ucheck.parser import parse
 
@@ -27,7 +27,7 @@ def test_good_playlist_has_no_issues():
 
 def test_missing_header_is_error():
     issues = run_checks(parse(GOOD.replace("#EXTM3U\n", "")))
-    assert any(i.level == "error" and "EXTM3U" in i.message for i in issues)
+    assert any(i.level is Level.ERROR and i.code == "missing-header" for i in issues)
 
 
 def test_extinf_without_url():
@@ -38,12 +38,15 @@ def test_extinf_without_url():
 def test_duplicate_url_is_warning():
     text = GOOD + '#EXTINF:-1 tvg-logo="l.png" group-title="A",Kopia\nhttps://example.com/1.m3u8\n'
     issues = run_checks(parse(text))
-    assert any("Dubblett" in i.message for i in issues)
+    dups = [i for i in issues if i.code == "duplicate-url"]
+    assert len(dups) == 1
+    assert dups[0].level is Level.WARNING
+    assert dups[0].channel.name == "Kopia"
 
 
 def test_invalid_scheme_is_error():
     issues = run_checks(parse(GOOD.replace("https://", "ftp://")))
-    assert any(i.level == "error" and "Ogiltig URL" in i.message for i in issues)
+    assert any(i.level is Level.ERROR and i.code == "invalid-scheme" for i in issues)
 
 
 def test_cli_on_example_returns_1(capsys):

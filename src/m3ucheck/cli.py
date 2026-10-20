@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .checks import run_checks
+from .checks import Level, run_checks
 from .parser import parse
 
 
@@ -25,13 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     result = parse(text)
     issues = run_checks(result)
     if args.errors_only:
-        issues = [i for i in issues if i.level == "error"]
+        issues = [i for i in issues if i.level is Level.ERROR]
 
     for i in issues:
-        print(f"rad {i.line:>4}  {i.level.upper():7}  {i.message}")
+        print(f"rad {i.line:>4}  {i.level.value.upper():7}  {i.message}")
 
-    n_err = sum(i.level == "error" for i in issues)
-    n_warn = sum(i.level == "warning" for i in issues)
+    n_err = sum(i.level is Level.ERROR for i in issues)
+    n_warn = sum(i.level is Level.WARNING for i in issues)
     print(f"\n{len(result.channels)} kanaler, {n_err} fel, {n_warn} varningar")
     return 1 if n_err else 0
 
