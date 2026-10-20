@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from m3ucheck.checks import Level, run_checks
+from m3ucheck.checks import Level, find_duplicates, run_checks
 from m3ucheck.cli import main
 from m3ucheck.parser import parse
 
@@ -48,6 +48,17 @@ def test_duplicate_url_is_warning():
     assert len(dups) == 1
     assert dups[0].level is Level.WARNING
     assert dups[0].channel.name == "Kopia"
+
+
+def test_find_duplicates_groups_in_file_order():
+    text = (
+        GOOD
+        + '#EXTINF:-1,Kopia\nhttps://example.com/1.m3u8\n'
+        + '#EXTINF:-1,Unik\nhttps://example.com/2.m3u8\n'
+    )
+    dups = find_duplicates(parse(text).channels)
+    assert list(dups) == ["https://example.com/1.m3u8"]
+    assert [ch.name for ch in dups["https://example.com/1.m3u8"]] == ["Kanal 1", "Kopia"]
 
 
 def test_invalid_scheme_is_error():
