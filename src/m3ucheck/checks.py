@@ -11,12 +11,6 @@ from .parser import Channel, ParseResult
 
 VALID_SCHEMES = {"http", "https", "rtmp", "rtsp", "udp", "rtp"}
 
-# Tillfällig koppling från parserns meddelanden till koder (ersätts i steg 3).
-PARSER_ERROR_CODES = {
-    "#EXTINF utan URL efter": "extinf-without-url",
-    "URL utan #EXTINF före": "url-without-extinf",
-}
-
 
 class Level(str, Enum):
     # Inte StrEnum (kräver 3.11). Formatera via .value – format() ger annars
@@ -40,8 +34,8 @@ def run_checks(result: ParseResult) -> list[Issue]:
     if not result.has_header:
         issues.append(Issue(Level.ERROR, 1, "Filen börjar inte med #EXTM3U", "missing-header"))
 
-    for lineno, msg in result.errors:
-        issues.append(Issue(Level.ERROR, lineno, msg, PARSER_ERROR_CODES[msg]))
+    for err in result.errors:
+        issues.append(Issue(Level.ERROR, err.line, err.message, err.code))
 
     by_url: dict[str, list[Channel]] = defaultdict(list)
     for ch in result.channels:

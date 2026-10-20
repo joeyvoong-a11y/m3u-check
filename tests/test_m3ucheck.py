@@ -32,7 +32,13 @@ def test_missing_header_is_error():
 
 def test_extinf_without_url():
     r = parse("#EXTM3U\n#EXTINF:-1,Ensam\n")
-    assert r.errors == [(2, "#EXTINF utan URL efter")]
+    assert [(e.line, e.code) for e in r.errors] == [(2, "extinf-without-url")]
+
+
+def test_url_without_extinf():
+    r = parse("#EXTM3U\nhttps://example.com/x\n")
+    assert [(e.line, e.code) for e in r.errors] == [(2, "url-without-extinf")]
+    assert r.channels == []
 
 
 def test_duplicate_url_is_warning():
