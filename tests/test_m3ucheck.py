@@ -3,6 +3,7 @@ from pathlib import Path
 from m3ucheck.checks import Level, find_duplicates, run_checks
 from m3ucheck.cli import main
 from m3ucheck.parser import parse
+from m3ucheck.report import Report, render_text
 
 GOOD = """#EXTM3U
 #EXTINF:-1 tvg-logo="l.png" group-title="A",Kanal 1
@@ -64,6 +65,15 @@ def test_find_duplicates_groups_in_file_order():
 def test_invalid_scheme_is_error():
     issues = run_checks(parse(GOOD.replace("https://", "ftp://")))
     assert any(i.level is Level.ERROR and i.code == "invalid-scheme" for i in issues)
+
+
+def test_report_counts_and_errors_only():
+    text = GOOD.replace("https://", "ftp://").replace(' group-title="A"', "")
+    report = Report(1, run_checks(parse(text)))
+    assert [i.code for i in report.errors] == ["invalid-scheme"]
+    assert [i.code for i in report.warnings] == ["missing-group"]
+    assert report.errors_only().issues == report.errors
+    assert render_text(report.errors_only()).endswith("\n1 kanaler, 1 fel, 0 varningar\n")
 
 
 def test_cli_on_example_returns_1(capsys):
