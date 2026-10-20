@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from m3ucheck.checks import run_checks
+from m3ucheck.checks import Level, find_duplicates, run_checks
 from m3ucheck.cli import main
 from m3ucheck.parser import parse
+from m3ucheck.report import Report, render_text
 
 GOOD = """#EXTM3U
 #EXTINF:-1 tvg-logo="l.png" group-title="A",Kanal 1
@@ -27,23 +28,52 @@ def test_good_playlist_has_no_issues():
 
 def test_missing_header_is_error():
     issues = run_checks(parse(GOOD.replace("#EXTM3U\n", "")))
-    assert any(i.level == "error" and "EXTM3U" in i.message for i in issues)
+    assert any(i.level is Level.ERROR and i.code == "missing-header" for i in issues)
 
 
 def test_extinf_without_url():
     r = parse("#EXTM3U\n#EXTINF:-1,Ensam\n")
-    assert r.errors == [(2, "#EXTINF utan URL efter")]
+    assert [(e.line, e.code) for e in r.errors] == [(2, "extinf-without-url")]
+
+
+def test_url_without_extinf():
+    r = parse("#EXTM3U\nhttps://example.com/x\n")
+    assert [(e.line, e.code) for e in r.errors] == [(2, "url-without-extinf")]
+    assert r.channels == []
 
 
 def test_duplicate_url_is_warning():
     text = GOOD + '#EXTINF:-1 tvg-logo="l.png" group-title="A",Kopia\nhttps://example.com/1.m3u8\n'
     issues = run_checks(parse(text))
-    assert any("Dubblett" in i.message for i in issues)
+    dups = [i for i in issues if i.code == "duplicate-url"]
+    assert len(dups) == 1
+    assert dups[0].level is Level.WARNING
+    assert dups[0].channel.name == "Kopia"
+
+
+def test_find_duplicates_groups_in_file_order():
+    text = (
+        GOOD
+        + '#EXTINF:-1,Kopia\nhttps://example.com/1.m3u8\n'
+        + '#EXTINF:-1,Unik\nhttps://example.com/2.m3u8\n'
+    )
+    dups = find_duplicates(parse(text).channels)
+    assert list(dups) == ["https://example.com/1.m3u8"]
+    assert [ch.name for ch in dups["https://example.com/1.m3u8"]] == ["Kanal 1", "Kopia"]
 
 
 def test_invalid_scheme_is_error():
     issues = run_checks(parse(GOOD.replace("https://", "ftp://")))
-    assert any(i.level == "error" and "Ogiltig URL" in i.message for i in issues)
+    assert any(i.level is Level.ERROR and i.code == "invalid-scheme" for i in issues)
+
+
+def test_report_counts_and_errors_only():
+    text = GOOD.replace("https://", "ftp://").replace(' group-title="A"', "")
+    report = Report(1, run_checks(parse(text)))
+    assert [i.code for i in report.errors] == ["invalid-scheme"]
+    assert [i.code for i in report.warnings] == ["missing-group"]
+    assert report.errors_only().issues == report.errors
+    assert render_text(report.errors_only()).endswith("\n1 kanaler, 1 fel, 0 varningar\n")
 
 
 def test_cli_on_example_returns_1(capsys):

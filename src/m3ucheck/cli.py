@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .checks import run_checks
 from .parser import parse
+from .report import Report, render_text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,17 +24,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     result = parse(text)
-    issues = run_checks(result)
+    report = Report(len(result.channels), run_checks(result))
     if args.errors_only:
-        issues = [i for i in issues if i.level == "error"]
+        report = report.errors_only()
 
-    for i in issues:
-        print(f"rad {i.line:>4}  {i.level.upper():7}  {i.message}")
-
-    n_err = sum(i.level == "error" for i in issues)
-    n_warn = sum(i.level == "warning" for i in issues)
-    print(f"\n{len(result.channels)} kanaler, {n_err} fel, {n_warn} varningar")
-    return 1 if n_err else 0
+    print(render_text(report), end="")
+    return 1 if report.errors else 0
 
 
 if __name__ == "__main__":
