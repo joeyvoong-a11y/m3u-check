@@ -1,0 +1,62 @@
+name: release
+
+# Bygger fristående program med PyInstaller och lägger upp dem på en
+# GitHub Release när en versionstagg pushas, t.ex.: git tag v0.1.0 && git push origin v0.1.0
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            asset: m3u-check-windows.exe
+          - os: ubuntu-latest
+            asset: m3u-check-linux
+          - os: macos-latest
+            asset: m3u-check-macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]" pyinstaller
+      - run: pytest -v
+
+      - name: Taggen måste matcha __version__
+        shell: bash
+        run: |
+          version=$(python -c "import m3ucheck; print(m3ucheck.__version__)")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Taggen $GITHUB_REF_NAME matchar inte __version__ = $version i src/m3ucheck/__init__.py"
+            exit 1
+          fi
+
+      - name: Bygg med PyInstaller
+        shell: bash
+        run: |
+          pyinstaller --onefile --name m3u-check --paths src \
+            --distpath dist --workpath build --specpath build packaging/m3u-check.py
+          ext=""; [ "$RUNNER_OS" = "Windows" ] && ext=".exe"
+          mv "dist/m3u-check$ext" "dist/${{ matrix.asset }}"
+
+      - name: Röktest av det byggda programmet
+        shell: bash
+        run: |
+          set +e
+          "dist/${{ matrix.asset }}" examples/sample.m3u
+          code=$?
+          set -e
+          # sample.m3u innehåller fel, så exit-koden ska vara 1
+          [ "$code" -eq 1 ]
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.asset }}

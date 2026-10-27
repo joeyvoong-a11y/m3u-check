@@ -65,10 +65,19 @@ def check_logo(result: ParseResult) -> Iterator[Issue]:
             yield Issue(Level.WARNING, ch.line, f"'{ch.name}' saknar tvg-logo", "missing-logo", ch)
 
 
+def _invalid_url(ch: Channel, code: str) -> Issue:
+    return Issue(Level.ERROR, ch.line, f"Ogiltig URL: {ch.url}", code, ch)
+
+
 def check_scheme(result: ParseResult) -> Iterator[Issue]:
     for ch in result.channels:
-        if urlparse(ch.url).scheme.lower() not in VALID_SCHEMES:
-            yield Issue(Level.ERROR, ch.line, f"Ogiltig URL: {ch.url}", "invalid-scheme", ch)
+        try:
+            scheme = urlparse(ch.url).scheme.lower()
+        except ValueError:  # t.ex. "http://[abc/x" (ogiltig IPv6-adress)
+            yield _invalid_url(ch, "malformed-url")
+            continue
+        if scheme not in VALID_SCHEMES:
+            yield _invalid_url(ch, "invalid-scheme")
 
 
 def check_duplicates(result: ParseResult) -> Iterator[Issue]:
@@ -94,4 +103,4 @@ CHECKS: list[Callable[[ParseResult], Iterable[Issue]]] = [
 
 def run_checks(result: ParseResult) -> list[Issue]:
     issues = [issue for check in CHECKS for issue in check(result)]
-    return sorted(issues, key=lambda i: i.line)
+    return sorted(issues, key=lambda issue: issue.line)

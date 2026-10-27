@@ -105,6 +105,12 @@ CASES = [
         "rad    2  WARNING  'HD\",Kanal 1' saknar group-title\n\n1 kanaler, 0 fel, 1 varningar\n",
     ),
     (
+        "malformed-url",
+        GOOD.replace("https://example.com/1.m3u8", "http://[abc/x"),
+        1,
+        "rad    2  ERROR    Ogiltig URL: http://[abc/x\n\n1 kanaler, 1 fel, 0 varningar\n",
+    ),
+    (
         "blank-line-before-header",
         "\n" + GOOD,
         1,

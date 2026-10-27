@@ -12,7 +12,25 @@ Ett litet kommandoradsverktyg i Python som läser IPTV-spellistor (M3U/M3U8) och
 | Kanal saknar namn, `group-title` eller `tvg-logo` | varning |
 | Samma stream-URL förekommer flera gånger | varning |
 
-## Kom igång
+## Ladda ner (utan Python)
+
+Färdiga program för Windows, Linux och macOS finns under [Releases](https://github.com/joeyvoong-a11y/m3u-check/releases/latest). Ladda ner filen för ditt system och kör den direkt:
+
+```bash
+m3u-check-windows.exe min-spellista.m3u      # Windows
+./m3u-check-linux min-spellista.m3u          # Linux (kör först: chmod +x m3u-check-linux)
+```
+
+På macOS kan Gatekeeper blockera programmet eftersom det inte är signerat. Högerklicka och välj *Öppna*, eller kör `xattr -d com.apple.quarantine m3u-check-macos`.
+
+## Installera med Python
+
+```bash
+pipx install git+https://github.com/joeyvoong-a11y/m3u-check
+m3u-check min-spellista.m3u
+```
+
+## Utveckling
 
 ```bash
 python -m venv .venv
@@ -46,7 +64,15 @@ src/m3ucheck/
   cli.py      # kommandoraden
 tests/        # pytest
 examples/     # exempelspellista
+packaging/    # startskript för PyInstaller-bygget
 ```
+
+## Släppa en ny version
+
+1. Höj `__version__` i `src/m3ucheck/__init__.py` och committa.
+2. Tagga och pusha: `git tag v0.1.0 && git push origin v0.1.0`
+
+GitHub Actions (`.github/workflows/release.yml`) kör testerna, bygger programmen för alla tre systemen och lägger upp dem på en ny release.
 
 ## Plan (kursens 6 veckor)
 

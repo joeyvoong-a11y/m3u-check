@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from m3ucheck.checks import Level, find_duplicates, run_checks
@@ -20,6 +21,14 @@ def test_parse_reads_name_url_and_attrs():
     assert ch.url == "https://example.com/1.m3u8"
     assert ch.group == "A"
     assert ch.line == 2
+
+
+def test_long_extinf_line_without_attrs_parses_fast():
+    text = "#EXTM3U\n#EXTINF:-1 " + "a" * 50_000 + "\n"
+    start = time.perf_counter()
+    r = parse(text)
+    assert time.perf_counter() - start < 1
+    assert [e.code for e in r.errors] == ["extinf-without-url"]
 
 
 def test_good_playlist_has_no_issues():
@@ -65,6 +74,11 @@ def test_find_duplicates_groups_in_file_order():
 def test_invalid_scheme_is_error():
     issues = run_checks(parse(GOOD.replace("https://", "ftp://")))
     assert any(i.level is Level.ERROR and i.code == "invalid-scheme" for i in issues)
+
+
+def test_malformed_url_is_error_not_crash():
+    issues = run_checks(parse(GOOD.replace("https://example.com/1.m3u8", "http://[abc/x")))
+    assert [(i.level, i.code) for i in issues] == [(Level.ERROR, "malformed-url")]
 
 
 def test_report_counts_and_errors_only():
