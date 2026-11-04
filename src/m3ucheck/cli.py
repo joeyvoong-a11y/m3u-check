@@ -6,9 +6,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from . import __version__
 from .checks import run_checks
 from .parser import parse
-from .report import Report, render_text
+from .report import Report, render_html, render_json, render_text
 
 
 def _use_utf8_output() -> None:
@@ -19,11 +20,24 @@ def _use_utf8_output() -> None:
             stream.reconfigure(encoding="utf-8")
 
 
+def _render(report: Report, fmt: str, title: str) -> str:
+    if fmt == "json":
+        return render_json(report)
+    if fmt == "html":
+        return render_html(report, title)
+    return render_text(report)
+
+
 def main(argv: list[str] | None = None) -> int:
     _use_utf8_output()
     ap = argparse.ArgumentParser(prog="m3u-check", description="Hitta fel i IPTV-spellistor (M3U).")
     ap.add_argument("file", type=Path, help="Sökväg till .m3u/.m3u8-fil")
     ap.add_argument("--errors-only", action="store_true", help="Visa bara fel, inte varningar")
+    ap.add_argument(
+        "--format", choices=["text", "json", "html"], default="text", help="Rapportens format (standard: text)"
+    )
+    ap.add_argument("-o", "--output", type=Path, help="Skriv till fil i stället för till skärmen")
+    ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = ap.parse_args(argv)
 
     try:
@@ -38,9 +52,21 @@ def main(argv: list[str] | None = None) -> int:
     report = Report(len(result.channels), run_checks(result))
     if args.errors_only:
         report = report.errors_only()
+    output, code = _render(report, args.format, args.file.name), 1 if report.errors else 0
+    message = None
 
-    print(render_text(report), end="")
-    return 1 if report.errors else 0
+    if args.output is None:
+        print(output, end="")
+    else:
+        try:
+            args.output.write_text(output, encoding="utf-8")
+        except OSError as e:
+            print(f"Kunde inte skriva filen: {e}", file=sys.stderr)
+            return 2
+        message = message or f"Rapporten skrevs till {args.output}"
+    if message:
+        print(message, file=sys.stderr)
+    return code
 
 
 if __name__ == "__main__":
