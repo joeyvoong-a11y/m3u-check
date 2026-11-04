@@ -5,3 +5,17 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+baseline.txt
+efter.txt
+
+# Riktiga spellistor innehåller ofta inloggningsuppgifter i URL:erna
+# (t.ex. http://server/användare/lösenord/123.ts). Bara exemplen committas.
+*.m3u
+*.m3u8
+!examples/*.m3u
+!examples/*.m3u8
+
+# Genererade rapporter och miljöfiler
+rapport*.html
+rapport*.json
+.env
