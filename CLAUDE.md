@@ -19,7 +19,7 @@ python -m venv .venv
 
 Always use the interpreter in the project's virtual environment (`.venv\Scripts\python`), not a global `python`/`pytest`.
 
-CI (`.github/workflows/tests.yml`) runs `pytest -v` on Python 3.12 for every push and PR. No linter or formatter is configured.
+CI (`.github/workflows/tests.yml`) runs `pytest -v` on Python 3.10 and 3.13, on Ubuntu and Windows, for every push and PR. No linter or formatter is configured.
 
 ## Architecture principles
 
@@ -42,16 +42,17 @@ These are the rules the code is expected to follow. Reviews should check the cod
 - `checks.py` defines `Level(str, Enum)` (not `StrEnum`, which needs 3.11; format it via `.value`), `Issue(level, line, message, code, channel)`, the check functions, `CHECKS`, `url_problem(url)` (shared with `fix.py`), and `find_duplicates(channels)`, which returns only URLs that occur more than once, with channels in file order. `run_checks` runs `CHECKS` in order and sorts stably by line.
 - `report.py` defines `Report(channel_count, issues, show_warnings)` with `errors`, `warnings`, `shown` and `errors_only()` (hides warnings but keeps counting them), and `render_text`, `render_json`, `render_html`. Text format: `rad {line:>4}  {LEVEL:7}  {message}` per issue, then a blank line and `N kanaler, X fel, Y varningar` (plus ` (visas inte)` when warnings are hidden).
 - `fix.py`: `fix_playlist` drops duplicates (keeps the first) and invalid URLs, sorts stably by `group-title` (no group last) and keeps the original `#EXTM3U` header.
-- `cli.py` reconfigures stdout/stderr to UTF-8 (needed for pipes and the PyInstaller exe). Flags: `--errors-only`, `--format text|json|html`, `--fix`, `-o/--output`, `--version`. Exit codes: `0` no errors (and always for `--fix`), `1` at least one error (warnings don't count), `2` the file couldn't be read or written. `python -m m3ucheck` works via `__main__.py`.
+- `cli.py` reconfigures stdout/stderr to UTF-8 (needed for pipes and the PyInstaller exe). Flags: `--errors-only`, `--format text|json|html`, `--fix`, `-o/--output`, `--version`. Exit codes are the constants `EXIT_OK`/`EXIT_ERRORS`/`EXIT_IO` (`0` no errors, and always for `--fix`; `1` at least one error, warnings don't count; `2` read/write failure, `-o` pointing at the input file without `--fix`, or `--fix` combined with `--format`/`--errors-only`). Files are decoded as strict UTF-8 (BOM allowed) and fall back to `FALLBACK_ENCODING` (cp1252) with a warning on stderr. `OSError`s are shown in Swedish via `_describe_os_error`, and a closed stdout pipe is not a crash (`_print_stdout`). `python -m m3ucheck` works via `__main__.py`.
 
 ## Known limitations
 
 - `--online` (week 3) is not implemented.
-- File reading uses `errors="replace"`, so invalid UTF-8 bytes become `�` silently.
+- `VALID_SCHEMES` is not configurable from the command line.
+- Duplicate URLs are compared exactly (no normalisation).
 
 ## Testing notes
 
 - `tests/test_golden.py` locks the exact CLI output and exit code for `sample.m3u` and edge cases. Do not change it in a refactor (see P8).
-- `tests/test_encoding.py` runs the CLI in a subprocess, because `capsys` never encodes to bytes and can't catch encoding bugs. `tests/test_features.py` covers `--format`, `-o` and `--fix`.
+- `tests/test_encoding.py` runs the CLI in a subprocess, because `capsys` never encodes to bytes and can't catch encoding bugs. `tests/test_features.py` covers `--format`, `-o` and `--fix`, and `tests/test_polish.py` the edge cases from the polish pass (`docs/hemuppgift4-polering.md`).
 - `tests/test_m3ucheck.py::test_cli_on_example_returns_1` depends on `examples/sample.m3u` (4 channels, at least 1 error). Update that test if you change the example file.
 - `baseline.txt` and `efter.txt` are gitignored snapshots of CLI output, used to check that a refactor doesn't change behavior. Capture with `.venv\Scripts\python -m m3ucheck.cli examples/sample.m3u | Out-File -Encoding utf8 efter.txt` and compare with `fc.exe baseline.txt efter.txt`.

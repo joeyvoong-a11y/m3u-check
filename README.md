@@ -74,6 +74,8 @@ Använd `-o` i stället för `>` i PowerShell, eftersom `>` där kan skriva file
 
 Exit-kod: `0` inga fel, `1` fel hittades (varningar räknas inte), `2` filen kunde inte läsas eller skrivas. `--fix` ger `0` när den städade listan har skrivits.
 
+Filer som inte är UTF-8 läses som Windows-1252, med en varning. `-o` vägrar skriva en rapport över själva spellistan.
+
 ## Struktur
 
 ```

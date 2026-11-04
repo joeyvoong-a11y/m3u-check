@@ -50,10 +50,11 @@ def test_sample_errors_only(capsys):
 
 
 def test_missing_file(tmp_path, capsys):
-    assert main([str(tmp_path / "finns-inte.m3u")]) == 2
+    path = tmp_path / "finns-inte.m3u"
+    assert main([str(path)]) == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err.startswith("Kunde inte läsa filen:")
+    assert captured.err == f"Kunde inte läsa filen {path}: filen eller mappen finns inte\n"
 
 
 CASES = [

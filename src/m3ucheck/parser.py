@@ -48,6 +48,7 @@ class ParseResult:
     has_header: bool
     errors: list[ParseError]
     header: str = ""  # #EXTM3U-raden med ev. attribut (t.ex. url-tvg), annars tom
+    is_empty: bool = False  # filen innehåller bara tomma rader (eller ingenting)
 
 
 @dataclass
@@ -111,4 +112,4 @@ def parse(text: str) -> ParseResult:
 
     if pending is not None:
         errors.append(_extinf_without_url(pending.line))
-    return ParseResult(channels, has_header, errors, first if has_header else "")
+    return ParseResult(channels, has_header, errors, first if has_header else "", is_empty=not first)

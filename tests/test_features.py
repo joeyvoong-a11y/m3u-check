@@ -82,7 +82,8 @@ def test_output_file(tmp_path, capsys):
 def test_output_file_unwritable(tmp_path, capsys):
     target = tmp_path / "finns-inte" / "rapport.txt"
     assert main([str(_write(tmp_path, GOOD)), "-o", str(target)]) == 2
-    assert capsys.readouterr().err.startswith("Kunde inte skriva filen:")
+    err = capsys.readouterr().err
+    assert err == f"Kunde inte skriva filen {target}: filen eller mappen finns inte\n"
 
 
 def test_fix_playlist():

@@ -24,6 +24,8 @@ def fix_playlist(result: ParseResult) -> FixResult:
     #EXTINF-raderna och direktiven skrivs ut som de stod, så inga attribut tappas.
     Rader som inte hörde till någon kanal (t.ex. URL utan #EXTINF) tas bort.
     """
+    # Kanalerna jämförs på identitet (id), inte likhet: två kanaler kan ha exakt
+    # samma innehåll men ändå vara olika rader i filen.
     duplicates = {id(ch) for dups in find_duplicates(result.channels).values() for ch in dups[1:]}
     invalid = [ch for ch in result.channels if url_problem(ch.url)]
     invalid_ids = {id(ch) for ch in invalid}

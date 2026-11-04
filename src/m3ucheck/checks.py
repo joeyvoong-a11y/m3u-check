@@ -38,8 +38,17 @@ def find_duplicates(channels: list[Channel]) -> dict[str, list[Channel]]:
 
 
 def check_header(result: ParseResult) -> Iterator[Issue]:
-    if not result.has_header:
+    # En tom fil får ett eget fel i stället för det missvisande "saknar #EXTM3U".
+    if result.is_empty:
+        yield Issue(Level.ERROR, 1, "Filen är tom", "empty-file")
+    elif not result.has_header:
         yield Issue(Level.ERROR, 1, "Filen börjar inte med #EXTM3U", "missing-header")
+
+
+def check_has_channels(result: ParseResult) -> Iterator[Issue]:
+    # Bara när inget annat fel förklarar det (t.ex. att alla #EXTINF saknar URL).
+    if not result.is_empty and not result.channels and not result.errors:
+        yield Issue(Level.WARNING, 1, "Spellistan innehåller inga kanaler", "no-channels")
 
 
 def check_parse_errors(result: ParseResult) -> Iterator[Issue]:
@@ -108,6 +117,7 @@ def check_duplicates(result: ParseResult) -> Iterator[Issue]:
 # körs (sorteringen på rad är stabil). Ändra den inte utan att ändra golden-testerna.
 CHECKS: list[Callable[[ParseResult], Iterable[Issue]]] = [
     check_header,
+    check_has_channels,
     check_parse_errors,
     check_name,
     check_group,
