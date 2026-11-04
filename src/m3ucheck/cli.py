@@ -11,7 +11,16 @@ from .parser import parse
 from .report import Report, render_text
 
 
+def _use_utf8_output() -> None:
+    # Vid pipe på Windows (och i exe-filen) blir stdout/stderr annars cp1252 och
+    # åäö går sönder. PYTHONUTF8 hjälper inte exe-filen, så det görs i koden.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):  # capsys och liknande saknar den
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _use_utf8_output()
     ap = argparse.ArgumentParser(prog="m3u-check", description="Hitta fel i IPTV-spellistor (M3U).")
     ap.add_argument("file", type=Path, help="Sökväg till .m3u/.m3u8-fil")
     ap.add_argument("--errors-only", action="store_true", help="Visa bara fel, inte varningar")
