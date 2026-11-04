@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .checks import Issue, Level
 
@@ -11,6 +11,7 @@ from .checks import Issue, Level
 class Report:
     channel_count: int
     issues: list[Issue]
+    show_warnings: bool = True
 
     @property
     def errors(self) -> list[Issue]:
@@ -20,16 +21,25 @@ class Report:
     def warnings(self) -> list[Issue]:
         return [issue for issue in self.issues if issue.level is Level.WARNING]
 
+    @property
+    def shown(self) -> list[Issue]:
+        """De issues som visas. Summeringen räknar alltid alla."""
+        return self.issues if self.show_warnings else self.errors
+
     def errors_only(self) -> Report:
-        return Report(self.channel_count, self.errors)
+        return replace(self, show_warnings=False)
+
+
+def _summary(report: Report) -> str:
+    summary = f"{report.channel_count} kanaler, {len(report.errors)} fel, {len(report.warnings)} varningar"
+    if not report.show_warnings and report.warnings:
+        summary += " (visas inte)"
+    return summary
 
 
 def render_text(report: Report) -> str:
-    # Summeringen räknar issues i just den här rapporten, så en filtrerad
-    # rapport (errors_only) visar "0 varningar".
     lines = [
         f"rad {issue.line:>4}  {issue.level.value.upper():7}  {issue.message}\n"
-        for issue in report.issues
+        for issue in report.shown
     ]
-    summary = f"{report.channel_count} kanaler, {len(report.errors)} fel, {len(report.warnings)} varningar"
-    return "".join(lines) + f"\n{summary}\n"
+    return "".join(lines) + f"\n{_summary(report)}\n"

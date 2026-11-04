@@ -27,7 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        text = args.file.read_text(encoding="utf-8", errors="replace")
+        # utf-8-sig tar bort en ev. BOM. errors="replace" så att en enstaka
+        # felkodad rad inte stoppar kontrollen av resten av filen.
+        text = args.file.read_text(encoding="utf-8-sig", errors="replace")
     except OSError as e:
         print(f"Kunde inte läsa filen: {e}", file=sys.stderr)
         return 2

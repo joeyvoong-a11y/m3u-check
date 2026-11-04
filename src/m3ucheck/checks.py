@@ -53,31 +53,47 @@ def check_name(result: ParseResult) -> Iterator[Issue]:
             yield Issue(Level.WARNING, ch.line, "Kanalen saknar namn", "missing-name", ch)
 
 
+def _label(ch: Channel) -> str:
+    return f"'{ch.name}'" if ch.name else "Kanal utan namn"
+
+
+def _missing_attr(ch: Channel, attr: str, code: str) -> Issue:
+    return Issue(Level.WARNING, ch.line, f"{_label(ch)} saknar {attr}", code, ch)
+
+
 def check_group(result: ParseResult) -> Iterator[Issue]:
     for ch in result.channels:
         if not ch.group:
-            yield Issue(Level.WARNING, ch.line, f"'{ch.name}' saknar group-title", "missing-group", ch)
+            yield _missing_attr(ch, "group-title", "missing-group")
 
 
 def check_logo(result: ParseResult) -> Iterator[Issue]:
     for ch in result.channels:
         if not ch.logo:
-            yield Issue(Level.WARNING, ch.line, f"'{ch.name}' saknar tvg-logo", "missing-logo", ch)
+            yield _missing_attr(ch, "tvg-logo", "missing-logo")
 
 
-def _invalid_url(ch: Channel, code: str) -> Issue:
-    return Issue(Level.ERROR, ch.line, f"Ogiltig URL: {ch.url}", code, ch)
+def check_tvg_id(result: ParseResult) -> Iterator[Issue]:
+    # Utan tvg-id kan spelaren inte koppla kanalen till programguiden (EPG).
+    for ch in result.channels:
+        if not ch.tvg_id:
+            yield _missing_attr(ch, "tvg-id", "missing-tvg-id")
+
+
+def url_problem(url: str) -> str | None:
+    """Felkoden för en ogiltig URL, eller None om den är giltig."""
+    try:
+        scheme = urlparse(url).scheme.lower()
+    except ValueError:  # t.ex. "http://[abc/x" (ogiltig IPv6-adress)
+        return "malformed-url"
+    return None if scheme in VALID_SCHEMES else "invalid-scheme"
 
 
 def check_scheme(result: ParseResult) -> Iterator[Issue]:
     for ch in result.channels:
-        try:
-            scheme = urlparse(ch.url).scheme.lower()
-        except ValueError:  # t.ex. "http://[abc/x" (ogiltig IPv6-adress)
-            yield _invalid_url(ch, "malformed-url")
-            continue
-        if scheme not in VALID_SCHEMES:
-            yield _invalid_url(ch, "invalid-scheme")
+        code = url_problem(ch.url)
+        if code:
+            yield Issue(Level.ERROR, ch.line, f"Ogiltig URL: {ch.url}", code, ch)
 
 
 def check_duplicates(result: ParseResult) -> Iterator[Issue]:
@@ -96,6 +112,7 @@ CHECKS: list[Callable[[ParseResult], Iterable[Issue]]] = [
     check_name,
     check_group,
     check_logo,
+    check_tvg_id,
     check_scheme,
     check_duplicates,
 ]

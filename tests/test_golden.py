@@ -1,8 +1,8 @@
 """Golden-tester: låser CLI:ts exakta utdata och exit-koder.
 
-Vissa fall låser medvetet nuvarande (felaktigt) beteende – BOM, komma i
-attribut, tom rad före #EXTM3U, kanal utan namn, summeringen med
---errors-only. Ändra dem bara som ett medvetet beslut att ändra beteendet.
+Fallen bom, comma-in-attribute, blank-line-before-header, nameless och
+summeringen med --errors-only var kända buggar som rättades i Hemuppgift 4.
+Ändra utdatan bara som ett medvetet beslut att ändra beteendet (P8).
 """
 
 from pathlib import Path
@@ -14,25 +14,27 @@ from m3ucheck.cli import main
 EXAMPLE = Path(__file__).parent.parent / "examples" / "sample.m3u"
 
 GOOD = """#EXTM3U
-#EXTINF:-1 tvg-logo="l.png" group-title="A",Kanal 1
+#EXTINF:-1 tvg-id="k1" tvg-logo="l.png" group-title="A",Kanal 1
 https://example.com/1.m3u8
 """
 
 SAMPLE_OUT = """\
 rad    4  WARNING  'Exempel Sport' saknar tvg-logo
 rad    6  WARNING  'Exempel Film' saknar group-title
+rad    6  WARNING  'Exempel Film' saknar tvg-id
 rad    6  ERROR    Ogiltig URL: ftp://example.com/film.ts
+rad    8  WARNING  'Exempel Nyheter HD' saknar tvg-id
 rad    8  WARNING  Dubblett av rad 2: https://example.com/live/news.m3u8
 rad   10  ERROR    #EXTINF utan URL efter
 
-4 kanaler, 2 fel, 3 varningar
+4 kanaler, 2 fel, 5 varningar
 """
 
 SAMPLE_ERRORS_ONLY_OUT = """\
 rad    6  ERROR    Ogiltig URL: ftp://example.com/film.ts
 rad   10  ERROR    #EXTINF utan URL efter
 
-4 kanaler, 2 fel, 0 varningar
+4 kanaler, 2 fel, 5 varningar (visas inte)
 """
 
 
@@ -42,7 +44,7 @@ def test_sample(capsys):
 
 
 def test_sample_errors_only(capsys):
-    # Summeringen räknas efter filtreringen, därav "0 varningar".
+    # Varningarna döljs men räknas fortfarande i summeringen.
     assert main([str(EXAMPLE), "--errors-only"]) == 1
     assert capsys.readouterr().out == SAMPLE_ERRORS_ONLY_OUT
 
@@ -73,8 +75,9 @@ CASES = [
         '#EXTM3U\n#EXTINF:-1 tvg-logo="l.png",\nhttps://example.com/1.m3u8\n',
         0,
         "rad    2  WARNING  Kanalen saknar namn\n"
-        "rad    2  WARNING  '' saknar group-title\n"
-        "\n1 kanaler, 0 fel, 2 varningar\n",
+        "rad    2  WARNING  Kanal utan namn saknar group-title\n"
+        "rad    2  WARNING  Kanal utan namn saknar tvg-id\n"
+        "\n1 kanaler, 0 fel, 3 varningar\n",
     ),
     (
         # Ordningen inom en rad följer ordningen kontrollerna körs i.
@@ -82,27 +85,28 @@ CASES = [
         '#EXTM3U\n#EXTINF:-1 tvg-logo="l.png" group-title="A",A\nftp://example.com/x\n'
         "#EXTINF:-1,B\nftp://example.com/x\n",
         1,
+        "rad    2  WARNING  'A' saknar tvg-id\n"
         "rad    2  ERROR    Ogiltig URL: ftp://example.com/x\n"
         "rad    4  WARNING  'B' saknar group-title\n"
         "rad    4  WARNING  'B' saknar tvg-logo\n"
+        "rad    4  WARNING  'B' saknar tvg-id\n"
         "rad    4  ERROR    Ogiltig URL: ftp://example.com/x\n"
         "rad    4  WARNING  Dubblett av rad 2: ftp://example.com/x\n"
-        "\n2 kanaler, 2 fel, 3 varningar\n",
+        "\n2 kanaler, 2 fel, 5 varningar\n",
     ),
     (
         "bom",
         "﻿" + GOOD,
-        1,
-        "rad    1  ERROR    Filen börjar inte med #EXTM3U\n"
-        "rad    1  ERROR    URL utan #EXTINF före\n"
-        "\n1 kanaler, 2 fel, 0 varningar\n",
+        0,
+        "\n1 kanaler, 0 fel, 0 varningar\n",
     ),
     (
         "comma-in-attribute",
         '#EXTM3U\n#EXTINF:-1 tvg-logo="l.png" group-title="Sport, HD",Kanal 1\n'
         "https://example.com/1.m3u8\n",
         0,
-        "rad    2  WARNING  'HD\",Kanal 1' saknar group-title\n\n1 kanaler, 0 fel, 1 varningar\n",
+        # Namnet är rätt och group-title "Sport, HD" hittas, så bara tvg-id saknas.
+        "rad    2  WARNING  'Kanal 1' saknar tvg-id\n\n1 kanaler, 0 fel, 1 varningar\n",
     ),
     (
         "malformed-url",
@@ -113,8 +117,8 @@ CASES = [
     (
         "blank-line-before-header",
         "\n" + GOOD,
-        1,
-        "rad    1  ERROR    Filen börjar inte med #EXTM3U\n\n1 kanaler, 1 fel, 0 varningar\n",
+        0,
+        "\n1 kanaler, 0 fel, 0 varningar\n",
     ),
 ]
 

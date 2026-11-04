@@ -7,7 +7,7 @@ from m3ucheck.parser import parse
 from m3ucheck.report import Report, render_text
 
 GOOD = """#EXTM3U
-#EXTINF:-1 tvg-logo="l.png" group-title="A",Kanal 1
+#EXTINF:-1 tvg-id="k1" tvg-logo="l.png" group-title="A",Kanal 1
 https://example.com/1.m3u8
 """
 
@@ -86,8 +86,8 @@ def test_report_counts_and_errors_only():
     report = Report(1, run_checks(parse(text)))
     assert [i.code for i in report.errors] == ["invalid-scheme"]
     assert [i.code for i in report.warnings] == ["missing-group"]
-    assert report.errors_only().issues == report.errors
-    assert render_text(report.errors_only()).endswith("\n1 kanaler, 1 fel, 0 varningar\n")
+    assert report.errors_only().shown == report.errors
+    assert render_text(report.errors_only()).endswith("\n1 kanaler, 1 fel, 1 varningar (visas inte)\n")
 
 
 def test_cli_on_example_returns_1(capsys):

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 # Lookbehind: börja bara matcha i början av ett namn, annars blir långa rader kvadratiska.
 ATTR_RE = re.compile(r'(?<![\w-])([\w-]+)="([^"]*)"')
 
+BOM = "\ufeff"
 EXTINF_WITHOUT_URL = "#EXTINF utan URL efter"
 URL_WITHOUT_EXTINF = "URL utan #EXTINF före"
 
@@ -34,6 +35,10 @@ class Channel:
     def logo(self) -> str:
         return self.attrs.get("tvg-logo", "")
 
+    @property
+    def tvg_id(self) -> str:
+        return self.attrs.get("tvg-id", "")
+
 
 @dataclass
 class ParseResult:
@@ -55,9 +60,22 @@ def _extinf_without_url(line: int) -> ParseError:
     return ParseError(line, "extinf-without-url", EXTINF_WITHOUT_URL)
 
 
+def _split_extinf(line: str) -> tuple[str, str]:
+    """Dela #EXTINF-raden i (attributdel, namn) vid första kommatecknet utanför citattecken."""
+    in_quotes = False
+    for i, char in enumerate(line):
+        if char == '"':
+            in_quotes = not in_quotes
+        elif char == "," and not in_quotes:
+            return line[:i], line[i + 1 :]
+    return line, ""
+
+
 def parse(text: str) -> ParseResult:
-    lines = text.splitlines()
-    has_header = bool(lines) and lines[0].strip().startswith("#EXTM3U")
+    lines = text.removeprefix(BOM).splitlines()
+    # Tomma rader före #EXTM3U räknas inte som att headern saknas.
+    first = next((line.strip() for line in lines if line.strip()), "")
+    has_header = first.startswith("#EXTM3U")
     channels: list[Channel] = []
     errors: list[ParseError] = []
 
@@ -70,9 +88,9 @@ def parse(text: str) -> ParseResult:
             if pending is not None:
                 errors.append(_extinf_without_url(pending.line))
             # Format: #EXTINF:-1 tvg-id="x" group-title="Y",Kanalnamn
-            # Attributen står före första kommatecknet, namnet efter. Ett dubblerat
-            # attribut tar det sista värdet (dict av findall).
-            head, _, name = stripped.partition(",")
+            # Attributen står före första kommatecknet utanför citattecken, namnet
+            # efter. Ett dubblerat attribut tar det sista värdet (dict av findall).
+            head, name = _split_extinf(stripped)
             pending = _PendingExtinf(lineno, name.strip(), dict(ATTR_RE.findall(head)))
         elif stripped.startswith("#"):
             continue  # andra direktiv, t.ex. #EXTVLCOPT
