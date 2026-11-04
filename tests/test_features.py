@@ -1,9 +1,10 @@
-"""Tester för funktionerna från Hemuppgift 4: tvg-id, --format och -o."""
+"""Tester för funktionerna från Hemuppgift 4: tvg-id, --format, -o och --fix."""
 
 import json
 
 from m3ucheck.checks import run_checks
 from m3ucheck.cli import main
+from m3ucheck.fix import fix_playlist
 from m3ucheck.parser import parse
 
 GOOD = """#EXTM3U
@@ -36,6 +37,12 @@ def _write(tmp_path, text):
 def test_missing_tvg_id_is_warning():
     issues = run_checks(parse(GOOD.replace(' tvg-id="k1"', "")))
     assert [(i.level.value, i.code) for i in issues] == [("warning", "missing-tvg-id")]
+
+
+def test_directives_belong_to_channel():
+    ch = parse(MESSY).channels[0]
+    assert ch.options == ["#EXTVLCOPT:http-user-agent=Test"]
+    assert ch.extinf == '#EXTINF:-1 tvg-id="s" group-title="Sport",Sport'
 
 
 def test_json_format(tmp_path, capsys):
@@ -76,6 +83,39 @@ def test_output_file_unwritable(tmp_path, capsys):
     target = tmp_path / "finns-inte" / "rapport.txt"
     assert main([str(_write(tmp_path, GOOD)), "-o", str(target)]) == 2
     assert capsys.readouterr().err.startswith("Kunde inte skriva filen:")
+
+
+def test_fix_playlist():
+    fixed = fix_playlist(parse(MESSY))
+    assert fixed.text == (
+        '#EXTM3U url-tvg="https://example.com/epg.xml"\n'
+        '#EXTINF:-1 tvg-id="n" group-title="Nyheter",Nyheter\n'
+        "https://example.com/news\n"
+        '#EXTINF:-1 tvg-id="s" group-title="Sport",Sport\n'
+        "#EXTVLCOPT:http-user-agent=Test\n"
+        "https://example.com/sport\n"
+        "#EXTINF:-1,Utan grupp\n"
+        "https://example.com/ingen\n"
+    )
+    assert (fixed.kept, fixed.removed_duplicates, fixed.removed_invalid) == (3, 1, 1)
+
+
+def test_fix_result_is_clean_of_errors():
+    fixed = fix_playlist(parse(MESSY))
+    again = run_checks(parse(fixed.text))
+    assert [i for i in again if i.level.value == "error"] == []
+    assert fix_playlist(parse(fixed.text)).text == fixed.text  # idempotent
+
+
+def test_fix_adds_missing_header():
+    assert fix_playlist(parse("#EXTINF:-1,A\nhttps://example.com/a\n")).text.startswith("#EXTM3U\n")
+
+
+def test_cli_fix(tmp_path, capsys):
+    target = tmp_path / "städad.m3u"
+    assert main([str(_write(tmp_path, MESSY)), "--fix", "-o", str(target)]) == 0
+    assert target.read_text(encoding="utf-8") == fix_playlist(parse(MESSY)).text
+    assert "3 kanaler kvar, 1 dubbletter och 1 ogiltiga URL:er borttagna" in capsys.readouterr().err
 
 
 def test_bom_file_on_disk(tmp_path, capsys):

@@ -26,6 +26,8 @@ class Channel:
     url: str
     line: int  # radnummer för #EXTINF-raden (1-baserat)
     attrs: dict[str, str] = field(default_factory=dict)
+    extinf: str = ""  # hela #EXTINF-raden som den stod i filen
+    options: list[str] = field(default_factory=list)  # t.ex. #EXTVLCOPT mellan #EXTINF och URL
 
     @property
     def group(self) -> str:
@@ -45,6 +47,7 @@ class ParseResult:
     channels: list[Channel]
     has_header: bool
     errors: list[ParseError]
+    header: str = ""  # #EXTM3U-raden med ev. attribut (t.ex. url-tvg), annars tom
 
 
 @dataclass
@@ -54,6 +57,8 @@ class _PendingExtinf:
     line: int
     name: str
     attrs: dict[str, str]
+    extinf: str
+    options: list[str] = field(default_factory=list)
 
 
 def _extinf_without_url(line: int) -> ParseError:
@@ -91,15 +96,19 @@ def parse(text: str) -> ParseResult:
             # Attributen står före första kommatecknet utanför citattecken, namnet
             # efter. Ett dubblerat attribut tar det sista värdet (dict av findall).
             head, name = _split_extinf(stripped)
-            pending = _PendingExtinf(lineno, name.strip(), dict(ATTR_RE.findall(head)))
+            pending = _PendingExtinf(lineno, name.strip(), dict(ATTR_RE.findall(head)), stripped)
         elif stripped.startswith("#"):
-            continue  # andra direktiv, t.ex. #EXTVLCOPT
+            # Andra direktiv, t.ex. #EXTVLCOPT. De hör till kanalen de står i.
+            if pending is not None:
+                pending.options.append(stripped)
         elif pending is not None:
-            channels.append(Channel(name=pending.name, url=stripped, line=pending.line, attrs=pending.attrs))
+            channels.append(
+                Channel(pending.name, stripped, pending.line, pending.attrs, pending.extinf, pending.options)
+            )
             pending = None
         else:
             errors.append(ParseError(lineno, "url-without-extinf", URL_WITHOUT_EXTINF))
 
     if pending is not None:
         errors.append(_extinf_without_url(pending.line))
-    return ParseResult(channels, has_header, errors)
+    return ParseResult(channels, has_header, errors, first if has_header else "")

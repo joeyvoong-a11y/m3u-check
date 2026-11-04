@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .checks import run_checks
+from .fix import fix_playlist
 from .parser import parse
 from .report import Report, render_html, render_json, render_text
 
@@ -36,6 +37,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--format", choices=["text", "json", "html"], default="text", help="Rapportens format (standard: text)"
     )
+    ap.add_argument(
+        "--fix",
+        action="store_true",
+        help="Skriv ut en städad spellista (utan dubbletter och ogiltiga URL:er, sorterad per grupp)",
+    )
     ap.add_argument("-o", "--output", type=Path, help="Skriv till fil i stället för till skärmen")
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = ap.parse_args(argv)
@@ -49,11 +55,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     result = parse(text)
-    report = Report(len(result.channels), run_checks(result))
-    if args.errors_only:
-        report = report.errors_only()
-    output, code = _render(report, args.format, args.file.name), 1 if report.errors else 0
-    message = None
+    if args.fix:
+        fixed = fix_playlist(result)
+        output, code = fixed.text, 0
+        message = (
+            f"{fixed.kept} kanaler kvar, {fixed.removed_duplicates} dubbletter "
+            f"och {fixed.removed_invalid} ogiltiga URL:er borttagna"
+        )
+    else:
+        report = Report(len(result.channels), run_checks(result))
+        if args.errors_only:
+            report = report.errors_only()
+        output, code = _render(report, args.format, args.file.name), 1 if report.errors else 0
+        message = None
 
     if args.output is None:
         print(output, end="")
